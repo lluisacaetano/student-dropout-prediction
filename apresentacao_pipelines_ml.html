@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparação de Pipelines de ML no KNIME</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (THEME)
+           Terminal Green Style
+           =========================================== */
+        :root {
+            /* Colors */
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --terminal-green: #39d353;
+            --terminal-yellow: #f0c674;
+            --terminal-blue: #58a6ff;
+            --terminal-purple: #bc8cff;
+            --terminal-red: #ff7b72;
+            --terminal-cyan: #79c0ff;
+            --text-primary: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-color: #30363d;
+
+            /* Typography - MUST use clamp() */
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --title-size: clamp(1.5rem, 4vw, 3rem);
+            --h2-size: clamp(1.25rem, 3vw, 2rem);
+            --body-size: clamp(0.7rem, 1.3vw, 1rem);
+            --small-size: clamp(0.6rem, 1vw, 0.85rem);
+            --code-size: clamp(0.8rem, 1.5vw, 1.1rem);
+
+            /* Spacing - MUST use clamp() */
+            --slide-padding: clamp(1rem, 4vw, 3rem);
+            --content-gap: clamp(0.5rem, 2vw, 1.5rem);
+
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.6s;
+        }
+
+        /* ===========================================
+           BASE STYLES
+           =========================================== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ===========================================
+           VIEWPORT FITTING: MANDATORY BASE STYLES
+           =========================================== */
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        html {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            padding: var(--slide-padding);
+        }
+
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
+        /* ===========================================
+           SCAN LINES EFFECT
+           =========================================== */
+        .slide::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.15) 2px,
+                rgba(0, 0, 0, 0.15) 4px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* ===========================================
+           TERMINAL WINDOW COMPONENT
+           =========================================== */
+        .terminal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            max-width: min(95vw, 1100px);
+            width: 90%;
+            margin: 0 auto;
+        }
+
+        .terminal.large {
+            max-width: min(95vw, 1200px);
+            width: 85%;
+        }
+
+        .terminal-header {
+            background: var(--bg-tertiary);
+            padding: clamp(0.5rem, 1.5vh, 0.8rem) clamp(0.8rem, 2vw, 1rem);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .terminal-btn {
+            width: clamp(10px, 1.5vw, 12px);
+            height: clamp(10px, 1.5vw, 12px);
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .btn-red { background: #ff5f56; }
+        .btn-yellow { background: #ffbd2e; }
+        .btn-green { background: #27c93f; }
+
+        .terminal-title {
+            margin-left: 0.8rem;
+            color: var(--text-muted);
+            font-size: var(--small-size);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .terminal-body {
+            padding: clamp(1.5rem, 4vh, 2.5rem) clamp(1.5rem, 4vw, 2.5rem);
+        }
+
+        /* ===========================================
+           CODE SYNTAX HIGHLIGHTING
+           =========================================== */
+        .code-line {
+            margin-bottom: clamp(0.5rem, 1.2vh, 0.8rem);
+            font-size: var(--code-size);
+            line-height: 1.6;
+        }
+
+        .prompt { color: var(--terminal-green); }
+        .comment { color: var(--text-muted); font-style: italic; }
+        .keyword { color: var(--terminal-purple); }
+        .string { color: var(--terminal-yellow); }
+        .function { color: var(--terminal-blue); }
+        .number { color: var(--terminal-green); }
+        .variable { color: var(--terminal-cyan); }
+        .error { color: var(--terminal-red); }
+
+        .cursor {
+            display: inline-block;
+            width: clamp(8px, 1vw, 10px);
+            height: 1.2em;
+            background: var(--terminal-green);
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* ===========================================
+           OUTPUT/TABLE STYLES
+           =========================================== */
+        .output {
+            margin-top: clamp(0.8rem, 2vh, 1.2rem);
+            padding-top: clamp(0.8rem, 2vh, 1rem);
+            border-top: 1px dashed var(--border-color);
+        }
+
+        .output-line {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            padding: clamp(0.2rem, 0.5vh, 0.4rem) 0;
+            font-size: var(--code-size);
+            gap: 1rem;
+            text-align: center;
+        }
+
+        .output-line .label:first-child,
+        .output-line .variable {
+            text-align: left;
+        }
+
+        .label { color: var(--text-muted); }
+        .value { color: var(--terminal-green); font-weight: 600; }
+        .value.highlight { color: var(--terminal-yellow); }
+        .value.better { color: var(--terminal-green); }
+        .value.worse { color: var(--terminal-red); }
+
+        /* ===========================================
+           TITLES & TEXT
+           =========================================== */
+        h1 {
+            font-size: var(--title-size);
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
+        }
+
+        h2 {
+            font-size: var(--h2-size);
+            font-weight: 600;
+            color: var(--terminal-green);
+            margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
+        }
+
+        .subtitle {
+            font-size: var(--body-size);
+            color: var(--text-muted);
+        }
+
+        /* ===========================================
+           COMPARISON TABLE
+           =========================================== */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+            gap: clamp(0.8rem, 2vw, 1.5rem);
+            margin-top: clamp(0.5rem, 1.5vh, 1rem);
+        }
+
+        .pipeline-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: clamp(0.8rem, 2vh, 1.2rem);
+        }
+
+        .pipeline-card h3 {
+            font-size: clamp(1rem, 1.8vw, 1.3rem);
+            color: var(--terminal-cyan);
+            margin-bottom: clamp(0.5rem, 1.2vh, 1rem);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pipeline-card.winner {
+            border-color: var(--terminal-green);
+            box-shadow: 0 0 20px rgba(57, 211, 83, 0.1);
+        }
+
+        .pipeline-card ul {
+            list-style: none;
+            font-size: clamp(0.8rem, 1.3vw, 1rem);
+        }
+
+        .pipeline-card li {
+            padding: clamp(0.25rem, 0.6vh, 0.5rem) 0;
+            color: var(--text-muted);
+        }
+
+        .pipeline-card li.highlight-info {
+            color: var(--terminal-yellow);
+            font-style: italic;
+        }
+
+        .pipeline-card li::before {
+            content: '>';
+            color: var(--terminal-green);
+            margin-right: 0.5rem;
+        }
+
+        /* ===========================================
+           STATS GRID
+           =========================================== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+            margin-top: clamp(0.5rem, 1.5vh, 1rem);
+        }
+
+        .stat-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: clamp(0.6rem, 1.5vh, 1rem);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: clamp(1.2rem, 3vw, 2rem);
+            font-weight: 700;
+            color: var(--terminal-green);
+        }
+
+        .stat-label {
+            font-size: var(--small-size);
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+        }
+
+        /* ===========================================
+           IMAGE SLIDES
+           =========================================== */
+        .slide-image {
+            max-width: 95%;
+            max-height: min(70vh, 600px);
+            object-fit: contain;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 1;
+            padding: var(--content-gap);
+        }
+
+        .image-label {
+            text-align: center;
+            margin-top: var(--content-gap);
+            font-size: var(--small-size);
+            color: var(--text-muted);
+        }
+
+        /* ===========================================
+           SPLIT LAYOUT (imagem + texto)
+           =========================================== */
+        .split-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: clamp(1rem, 3vw, 2rem);
+            align-items: center;
+            flex: 1;
+            margin-top: var(--content-gap);
+        }
+
+        .split-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .split-left .slide-image {
+            max-height: min(60vh, 500px);
+        }
+
+        .split-right {
+            display: flex;
+            flex-direction: column;
+            gap: var(--content-gap);
+        }
+
+        .metric-list {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.8rem, 2vh, 1.2rem);
+        }
+
+        .metric-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: clamp(0.6rem, 1.5vh, 1rem) clamp(0.8rem, 2vw, 1.2rem);
+        }
+
+        .metric-name {
+            display: block;
+            color: var(--terminal-cyan);
+            font-weight: 600;
+            font-size: clamp(0.9rem, 1.4vw, 1.1rem);
+            margin-bottom: 0.2rem;
+        }
+
+        .metric-desc {
+            display: block;
+            color: var(--text-muted);
+            font-size: clamp(0.75rem, 1.1vw, 0.9rem);
+        }
+
+        .metric-conclusion {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--terminal-green);
+            border-radius: 8px;
+            padding: clamp(0.6rem, 1.5vh, 1rem);
+            color: var(--terminal-green);
+            font-size: clamp(0.85rem, 1.3vw, 1rem);
+            text-align: center;
+        }
+
+        @media (max-width: 900px) {
+            .split-layout {
+                grid-template-columns: 1fr;
+            }
+            .split-left .slide-image {
+                max-height: min(40vh, 300px);
+            }
+        }
+
+        /* ===========================================
+           REVEAL ANIMATIONS
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal:nth-child(1) { transition-delay: 0.1s; }
+        .reveal:nth-child(2) { transition-delay: 0.2s; }
+        .reveal:nth-child(3) { transition-delay: 0.3s; }
+        .reveal:nth-child(4) { transition-delay: 0.4s; }
+        .reveal:nth-child(5) { transition-delay: 0.5s; }
+
+        /* Type animation for code lines */
+        .slide.visible .code-line {
+            animation: typeLine 0.4s ease-out both;
+        }
+
+        .slide.visible .code-line:nth-child(1) { animation-delay: 0.2s; }
+        .slide.visible .code-line:nth-child(2) { animation-delay: 0.35s; }
+        .slide.visible .code-line:nth-child(3) { animation-delay: 0.5s; }
+        .slide.visible .code-line:nth-child(4) { animation-delay: 0.65s; }
+        .slide.visible .code-line:nth-child(5) { animation-delay: 0.8s; }
+        .slide.visible .code-line:nth-child(6) { animation-delay: 0.95s; }
+        .slide.visible .code-line:nth-child(7) { animation-delay: 1.1s; }
+
+        @keyframes typeLine {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ===========================================
+           NAVIGATION DOTS
+           =========================================== */
+        .nav-dots {
+            position: fixed;
+            right: clamp(0.8rem, 2vw, 1.5rem);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(6px, 1vh, 10px);
+            z-index: 1000;
+        }
+
+        .nav-dot {
+            width: clamp(8px, 1vw, 10px);
+            height: clamp(8px, 1vw, 10px);
+            border-radius: 50%;
+            background: var(--border-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .nav-dot.active {
+            background: var(--terminal-green);
+            box-shadow: 0 0 10px var(--terminal-green);
+        }
+
+        .nav-dot:hover {
+            background: var(--terminal-green);
+            transform: scale(1.2);
+        }
+
+        /* ===========================================
+           PROGRESS BAR
+           =========================================== */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: var(--terminal-green);
+            z-index: 1001;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--terminal-green);
+        }
+
+        /* ===========================================
+           INLINE EDITING
+           =========================================== */
+        .edit-hotzone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+
+        .edit-toggle {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--terminal-green);
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .edit-toggle.active {
+            background: var(--terminal-green);
+            color: var(--bg-primary);
+        }
+
+        .edit-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        [contenteditable="true"] {
+            outline: 2px dashed var(--terminal-green);
+            outline-offset: 4px;
+            border-radius: 4px;
+        }
+
+        .edit-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--terminal-green);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: var(--small-size);
+            color: var(--terminal-green);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10002;
+        }
+
+        .edit-hint.show {
+            opacity: 1;
+        }
+
+        /* ===========================================
+           RESPONSIVE BREAKPOINTS
+           =========================================== */
+        @media (max-height: 700px) {
+            :root {
+                --slide-padding: clamp(0.75rem, 3vw, 2rem);
+                --title-size: clamp(1.25rem, 3.5vw, 2.5rem);
+            }
+        }
+
+        @media (max-height: 600px) {
+            :root {
+                --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+                --title-size: clamp(1.1rem, 3vw, 2rem);
+            }
+            .nav-dots { display: none; }
+        }
+
+        @media (max-height: 500px) {
+            :root {
+                --slide-padding: clamp(0.4rem, 2vw, 1rem);
+                --title-size: clamp(1rem, 2.5vw, 1.5rem);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            .nav-dots {
+                right: 0.5rem;
+            }
+        }
+
+        /* ===========================================
+           REDUCED MOTION
+           =========================================== */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+            html {
+                scroll-behavior: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Progress Bar -->
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Navigation Dots -->
+    <nav class="nav-dots" id="navDots"></nav>
+
+    <!-- Edit Controls -->
+    <div class="edit-hotzone" id="editHotzone"></div>
+    <button class="edit-toggle" id="editToggle" title="Modo edição (E)">✏️</button>
+    <div class="edit-hint" id="editHint">Clique em qualquer texto para editar • Ctrl+S para salvar</div>
+
+    <!-- ===========================================
+         SLIDE 1: TÍTULO
+         =========================================== -->
+    <section class="slide" data-slide="0">
+        <div class="slide-content">
+            <div class="terminal large reveal">
+                <div class="terminal-header">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                    <span class="terminal-title">pipeline_comparison.py — IFMG Formiga 2026</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="code-line">
+                        <span class="comment"># Comparação de Pipelines de Aprendizagem de Máquina</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment"># Previsão de Evasão Estudantil no KNIME</span>
+                    </div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="code-line">
+                        <span class="keyword">from</span> knime <span class="keyword">import</span> <span class="function">RandomForest</span>, <span class="function">PCA</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="variable">dataset</span> = <span class="string">"student_dropout_10k.csv"</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="variable">question</span> = <span class="string">"O pré-processamento sempre melhora os resultados?"</span><span class="cursor"></span>
+                    </div>
+
+                    <div class="output">
+                        <div class="output-line">
+                            <span class="label">Autores:</span>
+                            <span class="value" data-editable>Flávio, Luisa, Maria Luzia, Yasmin</span>
+                        </div>
+                        <div class="output-line">
+                            <span class="label">Disciplina:</span>
+                            <span class="value">Inteligência Artificial</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 2: O PROBLEMA
+         =========================================== -->
+    <section class="slide" data-slide="1">
+        <div class="slide-content">
+            <h2 class="reveal" data-editable>$ cat problema.md</h2>
+            <div class="terminal reveal">
+                <div class="terminal-header">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                    <span class="terminal-title">problema.md</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="code-line">
+                        <span class="comment"># A Questão Central</span>
+                    </div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="code-line">
+                        <span class="text-primary" data-editable>Dados brutos frequentemente apresentam:</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="prompt">  ></span> <span class="error">Valores ausentes</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="prompt">  ></span> <span class="error">Outliers</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="prompt">  ></span> <span class="error">Alta dimensionalidade</span>
+                    </div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="code-line">
+                        <span class="keyword">Pergunta:</span> <span class="string" data-editable>"O tratamento sempre melhora o modelo?"</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 3: DATASET
+         =========================================== -->
+    <section class="slide" data-slide="2">
+        <div class="slide-content">
+            <h2 class="reveal">$ describe dataset</h2>
+            <div class="stats-grid reveal">
+                <div class="stat-box">
+                    <div class="stat-value">10K</div>
+                    <div class="stat-label">Estudantes</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">19</div>
+                    <div class="stat-label">Atributos</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">5%</div>
+                    <div class="stat-label">Missing Values</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">23.5%</div>
+                    <div class="stat-label">Taxa de Evasão</div>
+                </div>
+            </div>
+            <div class="terminal reveal" style="margin-top: var(--content-gap);">
+                <div class="terminal-header">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                    <span class="terminal-title">dataset_info.json</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="code-line"><span class="prompt">{</span></div>
+                    <div class="code-line">  <span class="string">"name"</span>: <span class="string">"Student Dropout Prediction Dataset"</span>,</div>
+                    <div class="code-line">  <span class="string">"fonte"</span>: <span class="string">"Kaggle"</span>,</div>
+                    <div class="code-line">  <span class="string">"target"</span>: <span class="string">"Dropout"</span> <span class="comment">// 0=Permaneceu, 1=Evadiu</span>,</div>
+                    <div class="code-line">  <span class="string">"features"</span>: [<span class="string">"Age"</span>, <span class="string">"GPA"</span>, <span class="string">"Attendance"</span>, <span class="string">"..."</span>]</div>
+                    <div class="code-line"><span class="prompt">}</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 4: PIPELINES
+         =========================================== -->
+    <section class="slide" data-slide="3">
+        <div class="slide-content">
+            <h2 class="reveal">$ diff pipeline_a pipeline_b</h2>
+            <div class="comparison-grid reveal">
+                <div class="pipeline-card winner">
+                    <h3><span class="terminal-green">■</span> Pipeline A: Sem Tratamento</h3>
+                    <ul>
+                        <li>Dados brutos direto no modelo</li>
+                        <li>18 variáveis originais mantidas</li>
+                        <li>5% de missing values no dataset</li>
+                        <li>Random Forest lida internamente</li>
+                        <li class="highlight-info">Vencedor: 79.7% acurácia</li>
+                    </ul>
+                </div>
+                <div class="pipeline-card">
+                    <h3><span class="terminal-yellow">■</span> Pipeline B: Com Tratamento</h3>
+                    <ul>
+                        <li>Missing values → média da coluna</li>
+                        <li>1.098 outliers tratados (IQR)</li>
+                        <li>Normalização Z-score aplicada</li>
+                        <li>PCA: 17 → 5 variáveis (-70%)</li>
+                        <li class="highlight-info">Perdeu informação discriminativa</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="terminal reveal" style="margin-top: var(--content-gap);">
+                <div class="terminal-body" style="padding: 0.8rem 1rem;">
+                    <div class="code-line">
+                        <span class="prompt">$</span> <span class="function">classifier</span> = <span class="string">"Random Forest"</span> <span class="comment"># Mesmo para ambos</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="prompt">$</span> <span class="variable">train_split</span> = <span class="number">70%</span> | <span class="variable">test_split</span> = <span class="number">30%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 5: PIPELINE A - IMAGEM
+         =========================================== -->
+    <section class="slide" data-slide="4">
+        <div class="slide-content">
+            <h2 class="reveal">$ open pipeline_a.knwf</h2>
+            <p class="subtitle reveal">Pipeline A: Sem Tratamento de Dados</p>
+            <div class="image-container reveal">
+                <img src="assets/pipeline-a.png" alt="Pipeline A - Sem Tratamento" class="slide-image">
+            </div>
+            <p class="image-label reveal">CSV Reader → Number to String → Table Partitioner → Random Forest → Scorer</p>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 6: PIPELINE B - IMAGEM
+         =========================================== -->
+    <section class="slide" data-slide="5">
+        <div class="slide-content">
+            <h2 class="reveal">$ open pipeline_b.knwf</h2>
+            <p class="subtitle reveal">Pipeline B: Com Tratamento Completo</p>
+            <div class="image-container reveal">
+                <img src="assets/pipeline-b.png" alt="Pipeline B - Com Tratamento" class="slide-image">
+            </div>
+            <p class="image-label reveal">Missing Value → Outliers → Normalizer → PCA → Random Forest → Scorer</p>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 7: RESULTADOS
+         =========================================== -->
+    <section class="slide" data-slide="6">
+        <div class="slide-content">
+            <h2 class="reveal">$ python compare_results.py</h2>
+            <div class="terminal reveal">
+                <div class="terminal-header">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                    <span class="terminal-title">results_comparison.txt</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="code-line"><span class="comment"># Comparação de Métricas</span></div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="output" style="margin-top: 0; padding-top: 0; border: none;">
+                        <div class="output-line">
+                            <span class="label">Métrica</span>
+                            <span class="label">Sem Trat.</span>
+                            <span class="label">Com Trat.</span>
+                        </div>
+                        <div class="output-line" style="border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+                            <span class="variable">Acurácia</span>
+                            <span class="value better">79.7%</span>
+                            <span class="value worse">78.2%</span>
+                        </div>
+                        <div class="output-line">
+                            <span class="variable">Recall (Evadiu)</span>
+                            <span class="value better">60.7%</span>
+                            <span class="value worse">55.2%</span>
+                        </div>
+                        <div class="output-line">
+                            <span class="variable">Precisão (Evadiu)</span>
+                            <span class="value worse">39.1%</span>
+                            <span class="value better">41.2%</span>
+                        </div>
+                        <div class="output-line">
+                            <span class="variable">F1-Score (Evadiu)</span>
+                            <span class="value better">47.6%</span>
+                            <span class="value worse">47.2%</span>
+                        </div>
+                    </div>
+                    <div class="code-line" style="margin-top: 1rem;">
+                        <span class="prompt">>>></span> <span class="function">winner</span> = <span class="string">"Pipeline SEM Tratamento"</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 8: GRÁFICO COMPARATIVO
+         =========================================== -->
+    <section class="slide" data-slide="7">
+        <div class="slide-content" style="flex-direction: row; gap: 2rem; align-items: center;">
+            <div style="flex: 1.3;">
+                <h2 class="reveal">$ plot comparison_chart.png</h2>
+                <img src="assets/grafico-barras.png" alt="Gráfico Comparativo" class="slide-image reveal" style="max-height: 65vh; width: 100%;">
+                <p class="image-label reveal">Verde = Sem Tratamento | Azul = Com Tratamento</p>
+            </div>
+            <div class="split-right reveal" style="flex: 0.7;">
+                <div class="metric-list">
+                    <div class="metric-item">
+                        <span class="metric-name">Recall</span>
+                        <span class="metric-desc">% de evasões reais detectadas</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-name">Precision</span>
+                        <span class="metric-desc">% de previsões corretas de evasão</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-name">F-measure</span>
+                        <span class="metric-desc">Equilíbrio entre Recall e Precision</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-name">Accuracy</span>
+                        <span class="metric-desc">% total de acertos do modelo</span>
+                    </div>
+                </div>
+                <div class="metric-conclusion">
+                    <span class="prompt">></span> Verde vence em 3 de 4 métricas
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 9: ANÁLISE
+         =========================================== -->
+    <section class="slide" data-slide="8">
+        <div class="slide-content">
+            <h2 class="reveal">$ explain --why-no-improvement</h2>
+            <div class="terminal large reveal">
+                <div class="terminal-header">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                    <span class="terminal-title">analysis.log</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="code-line">
+                        <span class="prompt">[1]</span> <span class="keyword">Random Forest é robusto</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment">    Lida internamente com missing values e outliers</span>
+                    </div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="code-line">
+                        <span class="prompt">[2]</span> <span class="keyword">PCA descartou informação útil</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment">    17 → 5 variáveis pode eliminar padrões discriminativos</span>
+                    </div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="code-line">
+                        <span class="prompt">[3]</span> <span class="keyword">Dados já eram de boa qualidade</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment">    Apenas 5% de missing values - tratamento pouco impactante</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 10: CONCLUSÃO
+         =========================================== -->
+    <section class="slide" data-slide="9">
+        <div class="slide-content">
+            <h2 class="reveal">$ return conclusion</h2>
+            <div class="terminal large reveal">
+                <div class="terminal-header">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                    <span class="terminal-title">conclusion.py — Resultado Final</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="code-line">
+                        <span class="keyword">def</span> <span class="function">resposta</span>():
+                    </div>
+                    <div class="code-line">
+                        <span class="comment">    """</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment">    O tratamento dos dados contribuiu para</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment">    melhorar o desempenho do classificador?</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment">    """</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="keyword">    return</span> <span class="error">False</span>  <span class="comment"># NÃO melhorou!</span>
+                    </div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="code-line">
+                        <span class="prompt">>>></span> <span class="string">"Pipeline SEM tratamento: 79.7% acurácia"</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="prompt">>>></span> <span class="string">"Pipeline COM tratamento: 78.2% acurácia"</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="prompt">>>></span> <span class="variable">diferenca</span> = <span class="number">+1.5%</span> <span class="comment"># a favor dos dados brutos</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 11: OBRIGADO
+         =========================================== -->
+    <section class="slide" data-slide="10">
+        <div class="slide-content">
+            <div class="terminal large reveal">
+                <div class="terminal-header">
+                    <div class="terminal-btn btn-red"></div>
+                    <div class="terminal-btn btn-yellow"></div>
+                    <div class="terminal-btn btn-green"></div>
+                    <span class="terminal-title">thanks.sh</span>
+                </div>
+                <div class="terminal-body" style="text-align: center;">
+                    <div class="code-line">
+                        <span class="prompt">$</span> <span class="function">echo</span> <span class="string">"Obrigado!"</span>
+                    </div>
+                    <div class="code-line" style="font-size: var(--title-size); margin: 1rem 0;">
+                        <span class="terminal-green">Obrigado!</span>
+                    </div>
+                    <div class="code-line">
+                        <span class="comment"># Dúvidas?</span>
+                    </div>
+                    <div class="code-line">&nbsp;</div>
+                    <div class="code-line">
+                        <span class="prompt">$</span> exit <span class="number">0</span><span class="cursor"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        /* ===========================================
+           SLIDE PRESENTATION CONTROLLER
+           =========================================== */
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.totalSlides = this.slides.length;
+
+                this.setupIntersectionObserver();
+                this.setupKeyboardNav();
+                this.setupTouchNav();
+                this.setupProgressBar();
+                this.setupNavDots();
+            }
+
+            setupIntersectionObserver() {
+                const options = {
+                    root: null,
+                    rootMargin: '0px',
+                    threshold: 0.5
+                };
+
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            this.currentSlide = parseInt(entry.target.dataset.slide);
+                            this.updateNavDots();
+                            this.updateProgressBar();
+                        }
+                    });
+                }, options);
+
+                this.slides.forEach(slide => observer.observe(slide));
+            }
+
+            setupKeyboardNav() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.getAttribute('contenteditable') === 'true') return;
+
+                    switch(e.key) {
+                        case 'ArrowDown':
+                        case 'ArrowRight':
+                        case ' ':
+                        case 'PageDown':
+                            e.preventDefault();
+                            this.goToSlide(this.currentSlide + 1);
+                            break;
+                        case 'ArrowUp':
+                        case 'ArrowLeft':
+                        case 'PageUp':
+                            e.preventDefault();
+                            this.goToSlide(this.currentSlide - 1);
+                            break;
+                        case 'Home':
+                            e.preventDefault();
+                            this.goToSlide(0);
+                            break;
+                        case 'End':
+                            e.preventDefault();
+                            this.goToSlide(this.totalSlides - 1);
+                            break;
+                    }
+                });
+            }
+
+            setupTouchNav() {
+                let touchStartY = 0;
+                let touchEndY = 0;
+
+                document.addEventListener('touchstart', (e) => {
+                    touchStartY = e.changedTouches[0].screenY;
+                }, { passive: true });
+
+                document.addEventListener('touchend', (e) => {
+                    touchEndY = e.changedTouches[0].screenY;
+                    const diff = touchStartY - touchEndY;
+
+                    if (Math.abs(diff) > 50) {
+                        if (diff > 0) {
+                            this.goToSlide(this.currentSlide + 1);
+                        } else {
+                            this.goToSlide(this.currentSlide - 1);
+                        }
+                    }
+                }, { passive: true });
+            }
+
+            setupProgressBar() {
+                this.progressBar = document.getElementById('progressBar');
+                this.updateProgressBar();
+            }
+
+            updateProgressBar() {
+                const progress = ((this.currentSlide + 1) / this.totalSlides) * 100;
+                this.progressBar.style.width = progress + '%';
+            }
+
+            setupNavDots() {
+                const nav = document.getElementById('navDots');
+                for (let i = 0; i < this.totalSlides; i++) {
+                    const dot = document.createElement('button');
+                    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+                    dot.setAttribute('aria-label', `Ir para slide ${i + 1}`);
+                    dot.addEventListener('click', () => this.goToSlide(i));
+                    nav.appendChild(dot);
+                }
+                this.navDots = nav.querySelectorAll('.nav-dot');
+            }
+
+            updateNavDots() {
+                this.navDots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === this.currentSlide);
+                });
+            }
+
+            goToSlide(index) {
+                if (index < 0 || index >= this.totalSlides) return;
+                this.slides[index].scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        /* ===========================================
+           INLINE EDITOR
+           =========================================== */
+        class InlineEditor {
+            constructor() {
+                this.isActive = false;
+                this.editables = document.querySelectorAll('[data-editable]');
+                this.toggle = document.getElementById('editToggle');
+                this.hint = document.getElementById('editHint');
+                this.hotzone = document.getElementById('editHotzone');
+                this.hideTimeout = null;
+
+                this.setupHotzone();
+                this.setupKeyboard();
+                this.loadSavedContent();
+            }
+
+            setupHotzone() {
+                // Hotzone hover with delay
+                this.hotzone.addEventListener('mouseenter', () => {
+                    clearTimeout(this.hideTimeout);
+                    this.toggle.classList.add('show');
+                });
+
+                this.hotzone.addEventListener('mouseleave', () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggle.classList.remove('show');
+                    }, 400);
+                });
+
+                this.toggle.addEventListener('mouseenter', () => {
+                    clearTimeout(this.hideTimeout);
+                });
+
+                this.toggle.addEventListener('mouseleave', () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggle.classList.remove('show');
+                    }, 400);
+                });
+
+                // Click handlers
+                this.toggle.addEventListener('click', () => this.toggleEditMode());
+                this.hotzone.addEventListener('click', () => this.toggleEditMode());
+            }
+
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    // Toggle edit mode with E key
+                    if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+                        this.toggleEditMode();
+                    }
+
+                    // Save with Ctrl+S
+                    if (e.ctrlKey && e.key === 's') {
+                        e.preventDefault();
+                        this.saveContent();
+                    }
+                });
+            }
+
+            toggleEditMode() {
+                this.isActive = !this.isActive;
+                this.toggle.classList.toggle('active', this.isActive);
+                this.hint.classList.toggle('show', this.isActive);
+
+                this.editables.forEach(el => {
+                    el.contentEditable = this.isActive;
+                });
+
+                if (!this.isActive) {
+                    this.saveContent();
+                    this.toggle.classList.remove('show');
+                } else {
+                    this.toggle.classList.add('show');
+                }
+            }
+
+            saveContent() {
+                const content = {};
+                this.editables.forEach((el, index) => {
+                    content[index] = el.innerHTML;
+                });
+                localStorage.setItem('presentation_content', JSON.stringify(content));
+                console.log('Conteúdo salvo!');
+            }
+
+            loadSavedContent() {
+                const saved = localStorage.getItem('presentation_content');
+                if (saved) {
+                    const content = JSON.parse(saved);
+                    this.editables.forEach((el, index) => {
+                        if (content[index]) {
+                            el.innerHTML = content[index];
+                        }
+                    });
+                }
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            new SlidePresentation();
+            new InlineEditor();
+        });
+    </script>
+</body>
+</html>
